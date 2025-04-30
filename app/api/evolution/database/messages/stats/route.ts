@@ -1,0 +1,44 @@
+import { NextResponse } from "next/server"
+import { getMessageStats } from "@/lib/evolution-db-service"
+import { sql } from "@/lib/db"
+
+export async function GET(request: Request) {
+  try {
+    // Get the URL parameters
+    const url = new URL(request.url)
+    const instanceName = url.searchParams.get("instance")
+
+    if (!instanceName) {
+      return NextResponse.json({ error: "Instance name is required" }, { status: 400 })
+    }
+
+    // Get the latest configuration to verify the instance exists
+    const configResult = await sql`
+      SELECT * FROM evolution_config 
+      WHERE instance_name = ${instanceName}
+      ORDER BY updated_at DESC 
+      LIMIT 1
+    `
+
+    if (!configResult || configResult.length === 0) {
+      return NextResponse.json({ error: `No configuration found for instance: ${instanceName}` }, { status: 404 })
+    }
+
+    // Get message statistics
+    const stats = await getMessageStats(instanceName)
+
+    return NextResponse.json({
+      success: true,
+      data: stats,
+    })
+  } catch (error) {
+    console.error("Error fetching message stats:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
+  }
+}
